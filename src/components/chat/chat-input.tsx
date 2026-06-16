@@ -273,8 +273,8 @@ export function ChatInput() {
   const currentModel = getModelById(selectedModel);
 
   return (
-    <div className="border-t border-border bg-background p-4">
-      <form onSubmit={handleSubmit} className="relative">
+    <div className="border-t border-border bg-background p-4" role="region" aria-label="Ввод сообщения">
+      <form onSubmit={handleSubmit} className="relative" role="form" aria-label="Отправка сообщения">
         <div className="relative flex items-end rounded-xl border border-border bg-muted/30 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
           <textarea
             ref={textareaRef}
@@ -287,6 +287,8 @@ export function ChatInput() {
                 : `Напишите сообщение для ${currentModel?.name || 'AI'}...`
             }
             rows={1}
+            aria-label="Поле ввода сообщения"
+            aria-describedby="input-hint"
             className="flex-1 resize-none bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground min-h-[48px] max-h-[200px]"
             disabled={isStreaming}
           />
@@ -297,6 +299,7 @@ export function ChatInput() {
                 type="button"
                 onClick={handleStop}
                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                aria-label="Остановить генерацию"
                 title="Остановить генерацию"
               >
                 <Square className="h-4 w-4" />
@@ -306,6 +309,7 @@ export function ChatInput() {
                 type="submit"
                 disabled={!inputText.trim()}
                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Отправить сообщение"
                 title="Отправить (Enter)"
               >
                 <Send className="h-4 w-4" />
@@ -315,7 +319,7 @@ export function ChatInput() {
         </div>
 
         <div className="mt-2 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground" id="input-hint">
             {isCompareMode ? (
               <div className="flex items-center gap-1.5">
                 <LayoutGrid className="h-3.5 w-3.5" />
@@ -332,6 +336,11 @@ export function ChatInput() {
           </div>
         </div>
       </form>
+      
+      {/* Live region for screen readers */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {isStreaming ? 'Генерация ответа...' : ''}
+      </div>
     </div>
   );
 }

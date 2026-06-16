@@ -88,20 +88,41 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 }
 
-// localStorage persistence
+// localStorage persistence with debounce and error handling
 const STORAGE_KEY = 'ai-aggregator-state';
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+const SAVE_DEBOUNCE_MS = 500;
 
 function loadState(): Partial<ChatState> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    const saved = JSON.parse(raw);
+    
+    let saved: any;
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      console.error('Failed to parse saved state, clearing corrupted data');
+      localStorage.removeItem(STORAGE_KEY);
+      return {};
+    }
+    
+    const conversations = Array.isArray(saved.conversations) 
+      ? saved.conversations.filter((c: any) => c && typeof c.id === 'string')
+      : [];
+    
     return {
-      conversations: saved.conversations || [],
-      currentConversationId: saved.currentConversationId || null,
-      selectedModel: saved.selectedModel || 'glm-4-plus',
-      selectedModels: saved.selectedModels || ['glm-4-plus', 'gpt-4o'],
+      conversations: conversations as Conversation[],
+      currentConversationId: (saved.currentConversationId && typeof saved.currentConversationId === 'string') 
+        ? saved.currentConversationId 
+        : null,
+      selectedModel: (saved.selectedModel && typeof saved.selectedModel === 'string')
+        ? saved.selectedModel
+        : 'glm-4-plus',
+      selectedModels: (Array.isArray(saved.selectedModels) && saved.selectedModels.length > 0)
+        ? saved.selectedModels
+        : ['glm-4-plus', 'gpt-4o'],
       notificationEnabled: saved.notificationEnabled ?? true,
     };
   } catch {
@@ -109,23 +130,56 @@ function loadState(): Partial<ChatState> {
   }
 }
 
-function saveState(state: ChatState) {
+function saveState(state: ChatState, getState: () => ChatState) {
   if (typeof window === 'undefined') return;
-  try {
-    const toSave = {
-      conversations: state.conversations.map((c) => ({
-        ...c,
-        messages: c.messages.filter((m) => !m.isStreaming),
-      })),
-      currentConversationId: state.currentConversationId,
-      selectedModel: state.selectedModel,
-      selectedModels: state.selectedModels,
-      notificationEnabled: state.notificationEnabled,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  } catch {
-    // localStorage might be full
+  
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
   }
+  
+  saveTimeout = setTimeout(() => {
+    try {
+      const toSave = {
+        conversations: state.conversations.map((c) => ({
+          ...c,
+          messages: c.messages.filter((m) => !m.isStreaming),
+        })),
+        currentConversationId: state.currentConversationId,
+        selectedModel: state.selectedModel,
+        selectedModels: state.selectedModels,
+        notificationEnabled: state.notificationEnabled,
+      };
+      
+      const json = JSON.stringify(toSave);
+      const estimatedSize = new Blob([json]).size;
+      
+      if (estimatedSize > 4 * 1024 * 1024) {
+        console.warn('State size approaching localStorage limit:', estimatedSize);
+        const trimmedConversations = state.conversations.slice(0, 50);
+        const trimmedToSave = { ...toSave, conversations: trimmedConversations };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedToSave));
+        console.log('Trimmed state to last 50 conversations');
+      } else {
+        localStorage.setItem(STORAGE_KEY, json);
+      }
+    } catch (error) {
+      console.error('Failed to save state to localStorage:', error);
+      
+      try {
+        const stateInstance = getState();
+        const trimmed = {
+          conversations: stateInstance.conversations.slice(0, 30),
+          currentConversationId: stateInstance.currentConversationId,
+          selectedModel: stateInstance.selectedModel,
+          selectedModels: stateInstance.selectedModels,
+          notificationEnabled: stateInstance.notificationEnabled,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      } catch (retryError) {
+        console.error('localStorage retry failed:', retryError);
+      }
+    }
+  }, SAVE_DEBOUNCE_MS);
 }
 
 const loaded = loadState();
@@ -148,8 +202,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   searchQuery: '',
   notificationEnabled: (loaded.notificationEnabled as boolean) ?? true,
 
-  setSelectedModel: (model) => { set({ selectedModel: model }); saveState(get()); },
-  setSelectedModels: (models) => { set({ selectedModels: models }); saveState(get()); },
+  setSelectedModel: (model) => { set({ selectedModel: model }); saveState(get(), get); },
+  setSelectedModels: (models) => { set({ selectedModels: models }); saveState(get(), get); },
   toggleCompareMode: () => set((s) => ({ isCompareMode: !s.isCompareMode })),
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
   setShowTemplates: (show) => set({ showTemplates: show }),
@@ -163,7 +217,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   toggleNotification: () => {
     set((s) => ({ notificationEnabled: !s.notificationEnabled }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   createConversation: (systemPrompt?: string) => {
@@ -183,7 +237,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       conversations: [conversation, ...s.conversations],
       currentConversationId: id,
     }));
-    saveState(get());
+    saveState(get(), get);
     return id;
   },
 
@@ -195,10 +249,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ? s.conversations.find((c) => c.id !== id)?.id || null
           : s.currentConversationId,
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
-  setCurrentConversation: (id) => { set({ currentConversationId: id }); saveState(get()); },
+  setCurrentConversation: (id) => { set({ currentConversationId: id }); saveState(get(), get); },
 
   addMessage: (conversationId, message) => {
     set((s) => ({
@@ -208,7 +262,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : c
       ),
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   updateMessage: (conversationId, messageId, updates) => {
@@ -224,9 +278,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : c
       ),
     }));
-    // Save only when streaming ends
     if (!updates.isStreaming) {
-      saveState(get());
+      saveState(get(), get);
     }
   },
 
@@ -238,7 +291,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : c
       ),
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   updateConversationTitle: (id, title) => {
@@ -247,7 +300,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         c.id === id ? { ...c, title } : c
       ),
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   updateConversationSystemPrompt: (id, systemPrompt) => {
@@ -256,7 +309,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         c.id === id ? { ...c, systemPrompt } : c
       ),
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   toggleConversationPin: (id) => {
@@ -265,7 +318,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         c.id === id ? { ...c, pinned: !c.pinned } : c
       ),
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   updateConversationTag: (id, tag) => {
@@ -274,7 +327,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         c.id === id ? { ...c, tag } : c
       ),
     }));
-    saveState(get());
+    saveState(get(), get);
   },
 
   getCurrentConversation: () => {

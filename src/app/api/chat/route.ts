@@ -15,6 +15,28 @@ interface ChatRequest {
   provider: string;
 }
 
+// Rate limiting in-memory store
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 30; // max requests per window per IP
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const limit = rateLimitMap.get(ip);
+  
+  if (!limit || now > limit.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (limit.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  
+  limit.count += 1;
+  return true;
+}
+
 // Initialize ZAI SDK singleton
 let zaiInstance: ZAI | null = null;
 
@@ -25,14 +47,81 @@ async function getZAI(): Promise<ZAI> {
   return zaiInstance;
 }
 
+// Validate request body
+function validateRequest(body: unknown): body is ChatRequest {
+  if (!body || typeof body !== 'object') return false;
+  
+  const { messages, model, provider } = body as Record<string, unknown>;
+  
+  if (!Array.isArray(messages) || messages.length === 0) return false;
+  if (typeof model !== 'string' || !model) return false;
+  if (typeof provider !== 'string' || !provider) return false;
+  
+  // Validate message structure
+  return messages.every((msg: any) => 
+    msg && typeof msg === 'object' &&
+    ['user', 'assistant', 'system'].includes(msg.role) &&
+    typeof msg.content === 'string'
+  );
+}
+
 export async function POST(req: NextRequest) {
+  // Check rate limit
+  const ip = req.headers.get('x-forwarded-for') || 
+             req.headers.get('x-real-ip') || 
+             'unknown';
+  
+  if (!checkRateLimit(ip)) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'Too many requests. Please try again later.',
+        retryAfter: RATE_LIMIT_WINDOW_MS / 1000 
+      }),
+      { 
+        status: 429, 
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(RATE_LIMIT_WINDOW_MS / 1000)
+        } 
+      }
+    );
+  }
+
   try {
     const body = await req.json() as ChatRequest;
+
+    if (!validateRequest(body)) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request. Messages, model, and provider are required.',
+          details: { 
+            required: ['messages (array)', 'model (string)', 'provider (string)'],
+            messageFormat: { role: 'user | assistant | system', content: 'string' }
+          }
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { messages, model, provider } = body;
 
-    if (!messages || !model) {
+    // Check message length to prevent abuse
+    if (messages.length > 100) {
       return new Response(
-        JSON.stringify({ error: 'messages and model are required' }),
+        JSON.stringify({ 
+          error: 'Too many messages. Maximum 100 messages per request.' 
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check total content length
+    const totalLength = messages.reduce((sum, msg) => sum + msg.content.length, 0);
+    if (totalLength > 500_000) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Request too large. Maximum 500KB total content per request.' 
+        }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -196,12 +285,21 @@ export async function POST(req: NextRequest) {
     console.error('Chat API error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
+    // Check if it's a timeout error
+    const isTimeout = errorMessage.toLowerCase().includes('timeout') || 
+                      errorMessage.toLowerCase().includes('timed out');
+    
     const encoder = new TextEncoder();
     const errorStream = new ReadableStream({
       start(controller) {
         controller.enqueue(
           encoder.encode(
-            `event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`
+            `event: error\ndata: ${JSON.stringify({ 
+              error: isTimeout 
+                ? 'Сервер не успел ответить. Попробуйте снова.' 
+                : errorMessage,
+              isTimeout
+            })}\n\n`
           )
         );
         controller.enqueue(encoder.encode(`event: done\ndata: {}\n\n`));

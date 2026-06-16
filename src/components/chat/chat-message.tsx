@@ -132,7 +132,7 @@ export function ChatMessageComponent({ message, conversationId }: { message: Cha
     if (editText.trim()) {
       updateMessage(conversationId, message.id, {
         content: editText.trim(),
-        editedAt: new Date(),
+        editedAt: new Date().toISOString(),
       });
     }
     setIsEditing(false);
@@ -148,6 +148,9 @@ export function ChatMessageComponent({ message, conversationId }: { message: Cha
       className={`group flex gap-3 px-4 py-4 transition-colors ${
         isUser ? 'bg-transparent' : 'bg-muted/30'
       }`}
+      role="article"
+      aria-label={`${isUser ? 'Сообщение пользователя' : `Ответ от ${model?.name || 'AI'}`}`}
+      aria-live={message.isStreaming ? 'polite' : 'off'}
     >
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${

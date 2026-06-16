@@ -122,12 +122,13 @@ export default function Home() {
             )}
           </div>
 
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-0.5" role="toolbar" aria-label="Панель инструментов">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowWebSearch(true)}
               className="h-9 w-9"
+              aria-label="Веб-поиск (Ctrl+K)"
               title="Веб-поиск (Ctrl+K)"
             >
               <Search className="h-4 w-4" />
@@ -137,6 +138,7 @@ export default function Home() {
               size="icon"
               onClick={() => setShowImageGen(true)}
               className="h-9 w-9"
+              aria-label="Генерация изображений (Ctrl+Shift+I)"
               title="Генерация изображений (Ctrl+Shift+I)"
             >
               <ImagePlus className="h-4 w-4" />
@@ -146,6 +148,7 @@ export default function Home() {
               size="icon"
               onClick={() => setShowUsageStats(true)}
               className="h-9 w-9"
+              aria-label="Статистика использования"
               title="Статистика"
             >
               <BarChart3 className="h-4 w-4" />
@@ -155,6 +158,7 @@ export default function Home() {
               size="icon"
               onClick={() => setShowSettings(true)}
               className="h-9 w-9"
+              aria-label="Настройки (Ctrl+Shift+S)"
               title="Настройки (Ctrl+Shift+S)"
             >
               <Settings2 className="h-4 w-4" />
@@ -164,6 +168,7 @@ export default function Home() {
               size="icon"
               onClick={() => setShowTemplates(true)}
               className="h-9 w-9"
+              aria-label="Шаблоны промптов (Ctrl+Shift+P)"
               title="Шаблоны (Ctrl+Shift+P)"
             >
               <BookOpen className="h-4 w-4" />
@@ -173,6 +178,7 @@ export default function Home() {
               size="icon"
               onClick={toggleTheme}
               className="h-9 w-9"
+              aria-label={`Переключить тему на ${theme === 'dark' ? 'светлую' : 'тёмную'}`}
               title="Тема (Ctrl+D)"
             >
               <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -183,6 +189,7 @@ export default function Home() {
               size="icon"
               onClick={() => setShowShortcuts(true)}
               className="h-9 w-9"
+              aria-label="Горячие клавиши (Ctrl+/)"
               title="Горячие клавиши (Ctrl+/)"
             >
               <Keyboard className="h-4 w-4" />
