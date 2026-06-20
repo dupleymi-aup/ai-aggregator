@@ -6,12 +6,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { conversationId, role, content, provider, model, promptTokens, completionTokens, totalTokens } = body;
 
-    if (!conversationId || !role || !content) {
-      return NextResponse.json(
-        { error: 'conversationId, role, and content are required' },
-        { status: 400 }
-      );
+    if (!conversationId || typeof conversationId !== 'string') {
+      return NextResponse.json({ error: 'conversationId is required and must be a string' }, { status: 400 });
     }
+    if (!role || !['user', 'assistant', 'system'].includes(role)) {
+      return NextResponse.json({ error: 'role must be one of: user, assistant, system' }, { status: 400 });
+    }
+    if (!content || typeof content !== 'string') {
+      return NextResponse.json({ error: 'content is required and must be a string' }, { status: 400 });
+    }
+    if (content.length > 100_000) {
+      return NextResponse.json({ error: 'content exceeds maximum length of 100,000 characters' }, { status: 400 });
+    }
+    if (provider && typeof provider !== 'string') return NextResponse.json({ error: 'provider must be a string' }, { status: 400 });
+    if (model && typeof model !== 'string') return NextResponse.json({ error: 'model must be a string' }, { status: 400 });
+    if (promptTokens && (typeof promptTokens !== 'number' || promptTokens < 0)) return NextResponse.json({ error: 'promptTokens must be a non-negative number' }, { status: 400 });
+    if (completionTokens && (typeof completionTokens !== 'number' || completionTokens < 0)) return NextResponse.json({ error: 'completionTokens must be a non-negative number' }, { status: 400 });
+    if (totalTokens && (typeof totalTokens !== 'number' || totalTokens < 0)) return NextResponse.json({ error: 'totalTokens must be a non-negative number' }, { status: 400 });
 
     const message = await db.message.create({
       data: {

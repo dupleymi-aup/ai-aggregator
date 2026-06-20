@@ -30,8 +30,6 @@ export default function Home() {
     setShowShortcuts,
     createConversation,
     toggleSidebar,
-    selectedModel,
-    setSelectedModel,
   } = useChatStore();
 
   const { theme, setTheme } = useTheme();

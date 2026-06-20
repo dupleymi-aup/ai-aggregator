@@ -3,7 +3,7 @@
 import { useChatStore, type ChatMessage } from '@/lib/chat-store';
 import { getModelById, AI_PROVIDERS } from '@/lib/ai-providers';
 import { Bot, User, Copy, Check, AlertCircle, RefreshCw, Pencil, Trash2 } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -99,7 +99,7 @@ export function ChatMessageComponent({ message, conversationId }: { message: Cha
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.content);
-  const { updateMessage, deleteMessage, setInputText, selectedModel, isStreaming } = useChatStore();
+  const { updateMessage, deleteMessage, setInputText } = useChatStore();
 
   const isUser = message.role === 'user';
   const model = message.model ? getModelById(message.model) : undefined;

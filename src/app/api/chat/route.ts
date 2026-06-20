@@ -67,7 +67,7 @@ function validateRequest(body: unknown): body is ChatRequest {
 
 export async function POST(req: NextRequest) {
   // Check rate limit
-  const ip = req.headers.get('x-forwarded-for') || 
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
              req.headers.get('x-real-ip') || 
              'unknown';
   

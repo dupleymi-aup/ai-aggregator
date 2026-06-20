@@ -1,7 +1,7 @@
 'use client';
 
 import { useChatStore } from '@/lib/chat-store';
-import { MessageSquare, Plus, Search, ImagePlus, BarChart3, Keyboard } from 'lucide-react';
+import { MessageSquare, Plus, Search, ImagePlus, BarChart3 } from 'lucide-react';
 
 export function MobileNav() {
   const {

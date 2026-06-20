@@ -62,6 +62,10 @@ export async function PATCH(
     const body = await req.json();
     const { title } = body;
 
+    if (typeof title !== 'string') {
+      return NextResponse.json({ error: 'title is required and must be a string' }, { status: 400 });
+    }
+
     const conversation = await db.conversation.update({
       where: { id },
       data: { title },

@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { title } = body;
 
+    if (title !== undefined && typeof title !== 'string') {
+      return NextResponse.json({ error: 'title must be a string' }, { status: 400 });
+    }
+
     const conversation = await db.conversation.create({
       data: {
         title: title || 'Новый чат',

@@ -14,10 +14,18 @@ async function getZAI(): Promise<ZAI> {
 
 export async function POST(req: NextRequest) {
   try {
+    const SIZE_OPTIONS = ['1024x1024', '1024x1792', '1792x1024', '768x768', '768x1344', '1344x768'];
+
     const { prompt, size } = await req.json();
 
-    if (!prompt) {
-      return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
+    if (!prompt || typeof prompt !== 'string') {
+      return NextResponse.json({ error: 'prompt is required and must be a string' }, { status: 400 });
+    }
+    if (prompt.length > 4000) {
+      return NextResponse.json({ error: 'prompt exceeds maximum length of 4000 characters' }, { status: 400 });
+    }
+    if (size !== undefined && !SIZE_OPTIONS.includes(size)) {
+      return NextResponse.json({ error: `size must be one of: ${SIZE_OPTIONS.join(', ')}` }, { status: 400 });
     }
 
     const zai = await getZAI();

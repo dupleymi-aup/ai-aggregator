@@ -1,7 +1,7 @@
 'use client';
 
 import { useChatStore } from '@/lib/chat-store';
-import { AI_PROVIDERS, getModelById } from '@/lib/ai-providers';
+import { getModelById } from '@/lib/ai-providers';
 import { Send, Square, Sparkles, LayoutGrid } from 'lucide-react';
 import { useRef, useEffect, useCallback, FormEvent } from 'react';
 
@@ -248,9 +248,9 @@ export function ChatInput() {
     }).catch(() => {});
 
     if (isCompareMode) {
-      for (const modelId of selectedModels) {
-        sendMessage(content, modelId, conversationId, `asst_${modelId}_${Date.now()}`);
-      }
+      await Promise.all(selectedModels.map(modelId =>
+        sendMessage(content, modelId, conversationId, `asst_${modelId}_${Date.now()}`)
+      ));
     } else {
       await sendMessage(content, selectedModel, conversationId, `asst_${Date.now()}`);
     }
