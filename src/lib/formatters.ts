@@ -92,6 +92,7 @@ export function formatFileSize(bytes: number): string {
  * Escape HTML to prevent XSS
  */
 export function escapeHtml(text: string): string {
+  if (typeof document === 'undefined') return text;
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
@@ -106,17 +107,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       await navigator.clipboard.writeText(text);
       return true;
     }
-    
-    // Fallback for older browsers or non-HTTPS
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-    return true;
+    return false;
   } catch {
     return false;
   }
